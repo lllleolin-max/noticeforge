@@ -4,6 +4,7 @@ import unittest
 import zipfile
 import hashlib
 import struct
+import os
 from pathlib import Path
 from noticeforge import forge, Limits, InputError
 from noticeforge.expressions import validate_choice
@@ -125,6 +126,23 @@ class Tests(unittest.TestCase):
             else: value["components"]["order_app"]["sha256"] = checksum
             path.write_text(json.dumps(value), encoding="utf-8")
         with self.assertRaisesRegex(InputError, "cannot verify wheel"):
+            forge(*inputs, self.root / "out")
+    def test_symlink_wheel_escape(self):
+        inputs = scenario(self.root)
+        original, = inputs[2].glob("*.whl")
+        outside = self.root / "outside.whl"
+        outside.write_bytes(original.read_bytes())
+        linked = inputs[2] / "linked.whl"
+        try:
+            linked.symlink_to(outside)
+        except OSError as exc:
+            if getattr(exc, "winerror", None) == 1314:
+                self.skipTest("Windows symlink privilege unavailable")
+            raise
+        policy = json.loads(inputs[1].read_bytes())
+        policy["components"]["order_app"]["artifact"] = linked.name
+        inputs[1].write_text(json.dumps(policy), encoding="utf-8")
+        with self.assertRaisesRegex(InputError, "escapes directory"):
             forge(*inputs, self.root / "out")
 
 

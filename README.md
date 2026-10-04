@@ -15,9 +15,12 @@ The SDK exposes `forge(bom, approvals, wheel_dir, output, limits=Limits(...))`. 
 Run the complete local integration:
 
 ```console
+python -m pip install "setuptools>=77" wheel
 python examples/pilot.py pilot-output --cli noticeforge
 python -m unittest discover -s tests -v
 ```
+
+The pilot builds application wheels with `--no-build-isolation`, so it requires these explicit development build tools in the Python environment running the example. They are not NoticeForge runtime dependencies. Invoke the example as documented with ordinary Python so its adjacent independent `consumer.py` can be imported; the product wheel itself is separately tested with `python -I` and the actual registered CLI.
 
 The pilot builds five real wheels with setuptools, installs four into a separate environment, invokes their registered invoice CLI with actual CSV, checks the invoice using independent integer arithmetic, and compares the same notice materials with an independent correct manual collection baseline. It retains every output and repeated timing. CLI startup, validation, hashing and fsync can cost more than a simple copier for small inputs; timings do not establish human time savings.
 
