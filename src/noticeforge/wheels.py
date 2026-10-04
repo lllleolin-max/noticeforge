@@ -26,7 +26,7 @@ def collect(data, component, approval, limits):
             members = archive.infolist()
             if len(members) > limits.max_zip_members:
                 raise InputError("ZIP member allowance exceeded")
-            seen, total = {}, 0
+            seen, nodes, total = {}, {}, 0
             for member in members:
                 # ZipInfo.filename can silently truncate a raw NUL filename.
                 # Attribution must describe the original archive path exactly.
@@ -37,6 +37,14 @@ def collect(data, component, approval, limits):
                 if folded in seen:
                     raise InputError("duplicate/case/Unicode ZIP path collision")
                 seen[folded] = path
+                parts = path.split("/")
+                for position in range(1, len(parts) + 1):
+                    prefix = "/".join(parts[:position])
+                    directory = position < len(parts) or member.is_dir()
+                    key = collision_key(prefix)
+                    if key in nodes and nodes[key] != (prefix, directory):
+                        raise InputError("ZIP ancestor alias or file/directory collision")
+                    nodes[key] = (prefix, directory)
                 kind = stat.S_IFMT(member.external_attr >> 16)
                 if kind not in {0, stat.S_IFREG, stat.S_IFDIR} or member.flag_bits & 1:
                     raise InputError("nonregular or encrypted ZIP member")

@@ -101,6 +101,12 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(InputError, "original filename"):
             forge(*inputs, self.root / "out")
         self.assertFalse((self.root / "out").exists())
+    def test_case_and_unicode_directory_aliases(self):
+        for index, paths in enumerate((("Legal/LICENSE", "legal/AUTHORS"), ("caf\u00e9/LICENSE", "cafe\u0301/AUTHORS"))):
+            inputs = scenario(self.root / str(index), materials={paths[0]: b"a", paths[1]: b"b"})
+            with self.assertRaisesRegex(InputError, "ancestor alias"):
+                forge(*inputs, self.root / ("out" + str(index)))
+            self.assertFalse((self.root / ("out" + str(index))).exists())
 
 
 if __name__ == "__main__":

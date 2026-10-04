@@ -1,5 +1,7 @@
 # Contract and publication
 
+ZIP original decoded names must agree exactly with lookup names, rejecting NUL truncation. Every implicit/explicit ancestor uses a consistent spelling under NFC/case folding and consistent file/directory kind. This covers different leaf names under aliasing parents, not just equal full paths.
+
 The approval JSON is `noticeforge-approvals/v1` with exactly `format`, nonempty `approved_by`, `roots`, and `components`. Components map each included bom-ref to exactly `artifact` (wheel basename), lowercase `sha256`, `expression`, `choice` (simple license/WITH atoms), and `materials` (all License-File paths mapped to `sha256` and `licenses` atoms). Approval components must equal the root closure. No extra approvals silently broaden it.
 
 The BOM is CycloneDX 1.6 with a positive integer document version. Components are flat application/library records including metadata.component if supplied. Each needs unique bom-ref, name, version, one declared expression and one SHA-256 hash. Dependency rows are explicit, unique and complete, including empty leaves. Dangling edges and duplicate refs are rejected. Diamonds and cycles terminate through visited-node traversal. Nested components, evidence, pedigree, services, compositions, vulnerabilities and formulation are outside this version's scope. Other descriptive fields are retained in the original BOM bytes; they do not modify the declared closure or licensing decisions. No broad full-schema validation claim is made.
