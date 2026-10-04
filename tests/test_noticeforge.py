@@ -1,6 +1,8 @@
 import json
 import tempfile
 import unittest
+import zipfile
+import hashlib
 from pathlib import Path
 from noticeforge import forge, Limits, InputError
 from noticeforge.expressions import validate_choice
@@ -65,6 +67,23 @@ class Tests(unittest.TestCase):
         for cap in (True, 0, -1, 10**500):
             with self.assertRaises(InputError):
                 forge(*inputs, self.root / "out", limits=Limits(max_material_bytes=cap))
+    def test_legal_folded_metadata_header(self):
+        inputs = scenario(self.root, expression="MIT OR Apache-2.0")
+        artifact, = inputs[2].glob("*.whl")
+        with zipfile.ZipFile(artifact) as archive:
+            files = {name: archive.read(name) for name in archive.namelist()}
+        for name in files:
+            if name.endswith("/METADATA"):
+                files[name] = files[name].replace(b"MIT OR Apache-2.0", b"MIT OR\n Apache-2.0")
+        with zipfile.ZipFile(artifact, "w") as archive:
+            for name, data in files.items(): archive.writestr(name, data)
+        checksum = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        for path in inputs[:2]:
+            value = json.loads(path.read_bytes())
+            if "metadata" in value: value["metadata"]["component"]["hashes"][0]["content"] = checksum
+            else: value["components"]["order_app"]["sha256"] = checksum
+            path.write_text(json.dumps(value), encoding="utf-8")
+        self.assertEqual(forge(*inputs, self.root / "out")["status"], "PUBLISHED")
 
 
 if __name__ == "__main__":

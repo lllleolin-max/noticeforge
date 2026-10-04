@@ -8,6 +8,7 @@ import json
 import sys
 import zipfile
 from email.parser import Parser
+from email.policy import default
 from pathlib import Path
 
 
@@ -48,7 +49,7 @@ def consume(bom_path, policy_path, wheels, output):
             assert len(metadata_paths) == 1
             metadata_path = metadata_paths[0]
             metadata = archive.read(metadata_path)
-            headers = Parser().parsestr(metadata.decode("utf-8"))
+            headers = Parser(policy=default).parsestr(metadata.decode("utf-8"))
             assert headers["License-Expression"] == approved["expression"]
             assert headers["Name"] == component["name"] and headers["Version"] == component["version"]
             assert record["metadata_path"] == metadata_path

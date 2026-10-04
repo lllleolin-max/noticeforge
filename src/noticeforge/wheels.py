@@ -2,7 +2,7 @@ import io
 import stat
 import zipfile
 from email.parser import Parser
-from email.policy import compat32
+from email.policy import default
 from packaging.utils import canonicalize_name
 from packaging.version import Version, InvalidVersion
 from .contracts import digest, safe_path, collision_key, text, keys, sha
@@ -44,13 +44,17 @@ def collect(data, component, approval, limits):
                 raise InputError("exactly one top-level wheel METADATA required")
             metadata_path = metadata_paths[0]
             metadata = archive.read(metadata_path)
-            headers = Parser(policy=compat32).parsestr(metadata.decode("utf-8"))
+            # Metadata is UTF-8 email headers. Access through the header registry
+            # unfolds legal continuation lines before field contract checks.
+            headers = Parser(policy=default).parsestr(metadata.decode("utf-8"))
             if headers.defects:
                 raise InputError("malformed wheel metadata headers")
             def single(name):
                 values = headers.get_all(name, [])
                 if len(values) != 1:
                     raise InputError(f"exactly one {name} required")
+                if getattr(values[0], "defects", ()):
+                    raise InputError(f"malformed {name} header")
                 return text(str(values[0]), name)
             version = single("Metadata-Version")
             if version not in {"2.4", "2.5", "2.6"}:
