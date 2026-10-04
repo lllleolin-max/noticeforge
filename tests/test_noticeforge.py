@@ -84,6 +84,23 @@ class Tests(unittest.TestCase):
             else: value["components"]["order_app"]["sha256"] = checksum
             path.write_text(json.dumps(value), encoding="utf-8")
         self.assertEqual(forge(*inputs, self.root / "out")["status"], "PUBLISHED")
+    def test_raw_zip_nul_filename_refused(self):
+        inputs = scenario(self.root)
+        artifact, = inputs[2].glob("*.whl")
+        with zipfile.ZipFile(artifact) as archive:
+            files = [(name + "Xbad" if "/licenses/" in name else name, archive.read(name)) for name in archive.namelist()]
+        with zipfile.ZipFile(artifact, "w") as archive:
+            for name, data in files: archive.writestr(name, data)
+        artifact.write_bytes(artifact.read_bytes().replace(b"/licenses/LICENSEXbad", b"/licenses/LICENSE\x00bad"))
+        checksum = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        for path in inputs[:2]:
+            value = json.loads(path.read_bytes())
+            if "metadata" in value: value["metadata"]["component"]["hashes"][0]["content"] = checksum
+            else: value["components"]["order_app"]["sha256"] = checksum
+            path.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaisesRegex(InputError, "original filename"):
+            forge(*inputs, self.root / "out")
+        self.assertFalse((self.root / "out").exists())
 
 
 if __name__ == "__main__":

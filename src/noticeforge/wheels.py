@@ -28,6 +28,10 @@ def collect(data, component, approval, limits):
                 raise InputError("ZIP member allowance exceeded")
             seen, total = {}, 0
             for member in members:
+                # ZipInfo.filename can silently truncate a raw NUL filename.
+                # Attribution must describe the original archive path exactly.
+                if member.orig_filename != member.filename:
+                    raise InputError("ZIP original filename was normalized or truncated")
                 path = safe_path(member.filename[:-1] if member.is_dir() else member.filename)
                 folded = collision_key(path)
                 if folded in seen:
