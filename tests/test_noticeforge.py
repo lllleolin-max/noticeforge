@@ -1,0 +1,71 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from noticeforge import forge, Limits, InputError
+from noticeforge.expressions import validate_choice
+from fixtures import scenario
+
+
+class Tests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+    def tearDown(self):
+        self.temp.cleanup()
+    def test_diamond_cycle_and_unreachable(self):
+        inputs = scenario(self.root, ("app", "left", "right", "shared", "dev"), {"app": ["left", "right"], "left": ["shared"], "right": ["shared"], "shared": ["left"], "dev": []})
+        result = forge(*inputs, self.root / "out")
+        manifest = json.loads((self.root / "out/manifest.json").read_bytes())
+        self.assertEqual(result["components"], 4)
+        self.assertEqual(manifest["excluded"], ["dev"])
+        self.assertEqual(len(list((self.root / "out").rglob("LICENSE"))), 4)
+    def test_all_bytes_and_basenames(self):
+        materials = {"left/LICENSE": "版权\nline\r\n".encode(), "right/LICENSE": b"different\x00bytes\n"}
+        inputs = scenario(self.root, materials=materials)
+        forge(*inputs, self.root / "out")
+        manifest = json.loads((self.root / "out/manifest.json").read_bytes())
+        for entry in manifest["components"][0]["materials"]:
+            self.assertEqual((self.root / "out" / entry["output_path"]).read_bytes(), materials[entry["license_file"]])
+    def test_material_budget_exact(self):
+        inputs = scenario(self.root, materials={"LICENSE": b"12345"})
+        with self.assertRaises(InputError):
+            forge(*inputs, self.root / "under", limits=Limits(max_material_bytes=4))
+        self.assertFalse((self.root / "under").exists())
+        forge(*inputs, self.root / "exact", limits=Limits(max_material_bytes=5))
+    def test_bad_hash_and_input_unchanged(self):
+        inputs = scenario(self.root)
+        raw = [path.read_bytes() for path in inputs[:2]]
+        policy = json.loads(raw[1])
+        policy["components"]["order_app"]["materials"]["LICENSE"]["sha256"] = "0" * 64
+        inputs[1].write_text(json.dumps(policy), encoding="utf-8")
+        with self.assertRaises(InputError):
+            forge(*inputs, self.root / "out")
+        self.assertEqual(inputs[0].read_bytes(), raw[0])
+        self.assertFalse((self.root / "out").exists())
+    def test_duplicate_ref(self):
+        inputs = scenario(self.root)
+        bom = json.loads(inputs[0].read_bytes())
+        bom["components"] = [bom["metadata"]["component"]]
+        inputs[0].write_text(json.dumps(bom), encoding="utf-8")
+        with self.assertRaises(InputError):
+            forge(*inputs, self.root / "out")
+    def test_expression_branch_and_exception(self):
+        self.assertEqual(validate_choice("(MIT OR Apache-2.0) AND (MIT OR BSD-2-Clause)", ["MIT", "Apache-2.0"]), ["MIT", "Apache-2.0"])
+        self.assertEqual(validate_choice("GPL-2.0-only WITH Classpath-exception-2.0 OR MIT", ["GPL-2.0-only WITH Classpath-exception-2.0"]), ["GPL-2.0-only WITH Classpath-exception-2.0"])
+        with self.assertRaises(InputError):
+            validate_choice("MIT AND Apache-2.0", ["MIT"])
+    def test_alias_and_output_exists(self):
+        inputs = scenario(self.root)
+        for output in (inputs[0], inputs[2] / "output", self.root):
+            with self.assertRaises(InputError):
+                forge(*inputs, output)
+    def test_bad_limits(self):
+        inputs = scenario(self.root)
+        for cap in (True, 0, -1, 10**500):
+            with self.assertRaises(InputError):
+                forge(*inputs, self.root / "out", limits=Limits(max_material_bytes=cap))
+
+
+if __name__ == "__main__":
+    unittest.main()

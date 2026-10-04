@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "noticeforge"
+version = "0.1.0"
+description = "Materialize approved wheel license bytes from a CycloneDX dependency closure"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["packaging>=24.2,<27"]
+
+[project.scripts]
+noticeforge = "noticeforge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
