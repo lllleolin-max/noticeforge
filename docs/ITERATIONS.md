@@ -23,3 +23,11 @@ Ordinary after `43e0ac0687e9326f16b4f747b7d25c4365db7c93`: `raw-name-after` exit
 `probe_directory_alias.py` uses distinct leaf names Legal/LICENSE and legal/AUTHORS, with no explicit ZIP directory entries. Baseline and ordinary round2 `43e0ac0687e9326f16b4f747b7d25c4365db7c93` published with CLI 0, but Windows merged the two parent directories: actual `Legal/AUTHORS` disagreed with manifest `legal/AUTHORS`. `directory-alias-before` and `directory-alias-before-round2` exit 1 with original bytes, full output and native inventory mismatch retained. Both leaves alone had passed the prior full-path collision check.
 
 The product now validates every explicit and implicit path ancestor under NFC/case folding and enforces a consistent original spelling and directory/file kind. It refuses case/Unicode ancestor aliases and file/directory collisions before material reads or staging. Targeted tests cover different leaf names under case and NFC-equivalent parents. The unchanged original probe supplies ordinary-wheel after evidence.
+
+Ordinary after `4266c8a07bfe1a588fe47543ea3352b5b309d684`: `directory-alias-after` exits 0, SDK refuses, CLI 2, no destination. Eleven installed tests pass.
+
+## 4: Corrupt compression escapes the controlled refusal contract
+
+After the three corrections, a further actual archive test found that a reserved DEFLATE block type raised zlib.error outside the InputError mapping. `probe_deflate_error.py` updates actual wheel/BOM/approval hashes to the corrupted bytes, preserving the malformed original artifact. Ordinary before `4266c8a07bfe1a588fe47543ea3352b5b309d684` produced SDK zlib.error, registered CLI traceback/exit 1; `deflate-before` exits 1. Nothing was published, so this is an interface refusal defect rather than a false successful publication.
+
+Known decompressor/EOF errors are now mapped to the same controlled InputError/CLI REFUSED exit 2 as BadZipFile, with no publication. A targeted real compressed-input test and the unchanged original probe verify the correction. This fourth real correction is additional evidence; the first three already concern distinct supported workflow defects. No failure was intentionally inserted to create a cycle.

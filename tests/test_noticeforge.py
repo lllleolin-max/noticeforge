@@ -3,6 +3,7 @@ import tempfile
 import unittest
 import zipfile
 import hashlib
+import struct
 from pathlib import Path
 from noticeforge import forge, Limits, InputError
 from noticeforge.expressions import validate_choice
@@ -107,6 +108,24 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(InputError, "ancestor alias"):
                 forge(*inputs, self.root / ("out" + str(index)))
             self.assertFalse((self.root / ("out" + str(index))).exists())
+    def test_corrupt_deflate_controlled(self):
+        inputs = scenario(self.root)
+        artifact, = inputs[2].glob("*.whl")
+        with zipfile.ZipFile(artifact) as archive:
+            member = archive.infolist()[0]
+        raw = bytearray(artifact.read_bytes())
+        name, extra = struct.unpack_from("<HH", raw, member.header_offset + 26)
+        offset = member.header_offset + 30 + name + extra
+        raw[offset] = (raw[offset] & ~7) | 7
+        artifact.write_bytes(raw)
+        checksum = hashlib.sha256(raw).hexdigest()
+        for path in inputs[:2]:
+            value = json.loads(path.read_bytes())
+            if "metadata" in value: value["metadata"]["component"]["hashes"][0]["content"] = checksum
+            else: value["components"]["order_app"]["sha256"] = checksum
+            path.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaisesRegex(InputError, "cannot verify wheel"):
+            forge(*inputs, self.root / "out")
 
 
 if __name__ == "__main__":

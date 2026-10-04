@@ -1,6 +1,8 @@
 import io
 import stat
 import zipfile
+import zlib
+import lzma
 from email.parser import Parser
 from email.policy import default
 from packaging.utils import canonicalize_name
@@ -106,5 +108,6 @@ def collect(data, component, approval, limits):
             return {**component, "artifact": approval["artifact"], "choice": chosen,
                     "metadata_version": version, "metadata_path": metadata_path,
                     "metadata": metadata, "materials": collected}
-    except (zipfile.BadZipFile, KeyError, UnicodeError, OSError, RuntimeError, NotImplementedError, InvalidVersion) as exc:
+    except (zipfile.BadZipFile, KeyError, UnicodeError, OSError, RuntimeError,
+            NotImplementedError, InvalidVersion, zlib.error, lzma.LZMAError, EOFError) as exc:
         raise InputError(f"cannot verify wheel license materials: {exc}") from exc
